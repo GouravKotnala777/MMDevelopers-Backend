@@ -23,6 +23,11 @@ export interface NewPlotBody {
     agent?:string;
 };
 
+interface RegexType {
+    $regex:string;
+    $options:string;
+};
+
 export const createPlot = async(req:Request<{}, {}, NewPlotBody>, res:Response, next:NextFunction) => {
     try {
         const {site_name, plot_no, size, rate, duration, downPayment, hasSold} = req.body;
@@ -203,23 +208,6 @@ export const deletePlot = async(req:Request, res:Response, next:NextFunction) =>
         next(error);
     }
 };
-
-
-
-
-
-// export const allPlots = async(req:Request, res:Response, next:NextFunction) => {
-//     try {
-//         const plots = await Plot.find();
-        
-//         if (!plots) return next(new ErrorHandler("There is no Plot", 404));
-    
-//         return res.status(200).json({success:true, message:plots});
-//     } catch (error) {
-//         console.log(error);
-//         next(error);
-//     }
-// };
 export const plotsBySite = async(req:Request, res:Response, next:NextFunction) => {
     try {
         const {name} = req.params;
@@ -234,17 +222,49 @@ export const plotsBySite = async(req:Request, res:Response, next:NextFunction) =
         next(error);
     }
 };
-// export const getSinglePlot = async(req:Request, res:Response, next:NextFunction) => {
-//     try {
-//         const {id} = req.params;
-    
-//         const plot = await Plot.findById(id);
+export const searchClientByBody = async(req:Request, res:Response, next:NextFunction) => {
+    try {
+        let Result:any[] = [];
+        let clientQuery:{name?:RegexType; mobile?:RegexType; careTaker?:RegexType;} = {};
+        let plotQuery:{site_name?:RegexType; plot_no?:RegexType;} = {};
+        const {name, careTaker, mobile, plot_no, site_name} = req.body;        
+
+        if (name) {
+            clientQuery.name = {$regex:name, $options:"i"};
+        }
+        if (mobile) {
+            clientQuery.mobile = {$regex:mobile, $options:"i"};
+        }
+        if (careTaker) {
+            clientQuery.careTaker = {$regex:careTaker, $options:"i"};
+        }
+        if (site_name) {
+            plotQuery.site_name = {$regex:site_name, $options:"i"};
+        }
+        if (plot_no) {
+            plotQuery.plot_no = plot_no;
+        }
+        const clients = await Client.find(clientQuery);
+
+        if (clients.length === 0) return next(new ErrorHandler("Client not found", 404));
         
-//         if (!plot) return next(new ErrorHandler("Plot not found", 404));
-    
-//         return res.status(200).json({success:true, message:plot});
-//     } catch (error) {
-//         console.log(error);
-//         next(error);
-//     }
-// };
+        if (!plotQuery.plot_no && !plotQuery.site_name) {
+            await Promise.all(
+                clients.map(async (client) => {
+                    let plotWithClientId = await Plot.find({client:client._id}).populate({path:"client", model:"Client", select:"code name careTaker mobile"});
+                    if (plotWithClientId.length !== 0){
+                        Result.push(...plotWithClientId);
+                    }
+                })
+            )
+        }
+        else{
+            const plots = await Plot.find(plotQuery).populate({path:"client", model:"Client", select:"code name careTaker mobile"});
+            if (plots.length === 0) return next(new ErrorHandler("Plot not found", 404));
+            Result.push(...plots);
+        }
+        return res.status(200).json({success:true, message:Result});
+    } catch (error) {
+        next(error);
+    }
+};

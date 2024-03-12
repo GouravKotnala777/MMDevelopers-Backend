@@ -133,6 +133,10 @@ export const deleteSite = async(req:Request, res:Response, next:NextFunction) =>
         const site = await Site.findByIdAndDelete(siteID);
         
         if (!site) return next(new ErrorHandler("No sites found", 404));
+
+        site.plots.forEach(async (plotID) => {
+            await Plot.findByIdAndDelete(plotID);
+        });
     
         res.status(200).json({success:true, message:"Site deleted successfully"});
     } catch (error) {

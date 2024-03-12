@@ -18,7 +18,7 @@ const clientSchema = new mongoose.Schema(
             type:String
         },
         mobile:{
-            type:Number
+            type:String
         },
         role:{
             type:String,
